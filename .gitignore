@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+
+# データファイル
+data/raw/*.xlsx
+data/raw/*.xls
+data/raw/*.csv
+data/processed/*.csv
+data/processed/*.pkl
+
+# モデルファイル
+models/*.pkl
+models/*.joblib
+models/*.h5
+
+# 環境変数
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ログファイル
+*.log
