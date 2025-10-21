@@ -18,13 +18,15 @@ from src.lightgbm_models import LightGBMForecaster
 import warnings
 warnings.filterwarnings('ignore')
 
-# 日本語フォント設定（代替）
-plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
+# 日本語フォント設定
+plt.rcParams['font.family'] = 'IPAexGothic'
+plt.rcParams['font.sans-serif'] = ['IPAexGothic', 'Noto Sans CJK JP', 'DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False
 
 # スタイル設定
 sns.set_style('whitegrid')
 sns.set_palette('husl')
+sns.set_context("notebook", font_scale=1.0)
 
 
 def plot_category_comparison(sheet_name: str, save_dir: Path):
@@ -78,29 +80,37 @@ def plot_category_comparison(sheet_name: str, save_dir: Path):
 
     # 訓練期間の実績
     ax.plot(train_monthly['ds'], train_monthly['y'],
-            'o-', linewidth=2, markersize=4, label='Training Data', color='blue', alpha=0.7)
+            'o-', linewidth=2, markersize=4, label='訓練データ', color='blue', alpha=0.7)
 
     # テスト期間の実績
     ax.plot(test_monthly['ds'], test_monthly['y'],
-            'o-', linewidth=3, markersize=6, label='Actual (Test)', color='black', zorder=10)
+            'o-', linewidth=3, markersize=6, label='実績（テスト期間）', color='black', zorder=10)
 
     # 各モデルの予測
     colors = ['red', 'green', 'orange', 'purple', 'brown']
+    model_name_jp = {
+        'Moving Avg (3M)': '移動平均(3か月)',
+        'Moving Avg (6M)': '移動平均(6か月)',
+        'Seasonal Naive': '前年同月',
+        'Robust MA (6M)': 'ロバスト移動平均(6か月)',
+        'LightGBM': 'LightGBM'
+    }
     for i, (model_name, pred_df) in enumerate(models_predictions.items()):
+        jp_name = model_name_jp.get(model_name, model_name)
         ax.plot(pred_df['ds'], pred_df['yhat'],
-                's--', linewidth=2, markersize=5, label=f'{model_name}',
+                's--', linewidth=2, markersize=5, label=jp_name,
                 color=colors[i % len(colors)], alpha=0.8)
 
     # 訓練/テスト境界線
     train_test_boundary = train_monthly['ds'].max()
     ax.axvline(x=train_test_boundary, color='red', linestyle=':', linewidth=2,
-               label='Train/Test Split', alpha=0.7)
+               label='訓練/テスト分割', alpha=0.7)
 
-    ax.set_xlabel('Date', fontsize=14, fontweight='bold')
-    ax.set_ylabel('Sales Volume', fontsize=14, fontweight='bold')
-    ax.set_title(f'{sheet_name} Category: Predictions vs Actual Data',
+    ax.set_xlabel('日付', fontsize=14, fontweight='bold')
+    ax.set_ylabel('販売台数', fontsize=14, fontweight='bold')
+    ax.set_title(f'{sheet_name}カテゴリ: 予測 vs 実績',
                  fontsize=16, fontweight='bold', pad=20)
-    ax.legend(loc='best', fontsize=11, framealpha=0.9)
+    ax.legend(loc='best', fontsize=11, framealpha=0.9, prop={'family': 'IPAexGothic'})
     ax.grid(True, alpha=0.3)
     plt.xticks(rotation=45)
     plt.tight_layout()
@@ -118,19 +128,20 @@ def plot_category_comparison(sheet_name: str, save_dir: Path):
 
     # 実績
     ax.plot(test_monthly['ds'], test_monthly['y'],
-            'o-', linewidth=3, markersize=8, label='Actual', color='black', zorder=10)
+            'o-', linewidth=3, markersize=8, label='実績', color='black', zorder=10)
 
     # 各モデルの予測
     for i, (model_name, pred_df) in enumerate(models_predictions.items()):
+        jp_name = model_name_jp.get(model_name, model_name)
         ax.plot(pred_df['ds'], pred_df['yhat'],
-                's--', linewidth=2, markersize=6, label=f'{model_name}',
+                's--', linewidth=2, markersize=6, label=jp_name,
                 color=colors[i % len(colors)], alpha=0.8)
 
-    ax.set_xlabel('Date', fontsize=14, fontweight='bold')
-    ax.set_ylabel('Sales Volume', fontsize=14, fontweight='bold')
-    ax.set_title(f'{sheet_name} Category: Test Period Detail (2024-06 to 2025-05)',
+    ax.set_xlabel('日付', fontsize=14, fontweight='bold')
+    ax.set_ylabel('販売台数', fontsize=14, fontweight='bold')
+    ax.set_title(f'{sheet_name}カテゴリ: テスト期間詳細 (2024-06 ～ 2025-05)',
                  fontsize=16, fontweight='bold', pad=20)
-    ax.legend(loc='best', fontsize=11, framealpha=0.9)
+    ax.legend(loc='best', fontsize=11, framealpha=0.9, prop={'family': 'IPAexGothic'})
     ax.grid(True, alpha=0.3)
     plt.xticks(rotation=45)
     plt.tight_layout()
@@ -174,14 +185,17 @@ def plot_category_comparison(sheet_name: str, save_dir: Path):
 
     metrics_df = pd.DataFrame(metrics_data)
 
+    # モデル名を日本語に変換
+    metrics_df['Model_JP'] = metrics_df['Model'].map(model_name_jp)
+
     # 3つのメトリクスを横並びで表示
     fig, axes = plt.subplots(1, 3, figsize=(18, 6))
 
     # MAPE
     ax = axes[0]
-    bars = ax.bar(metrics_df['Model'], metrics_df['MAPE'], color=colors[:len(metrics_df)])
+    bars = ax.bar(metrics_df['Model_JP'], metrics_df['MAPE'], color=colors[:len(metrics_df)])
     ax.set_ylabel('MAPE (%)', fontsize=12, fontweight='bold')
-    ax.set_title('Mean Absolute Percentage Error', fontsize=14, fontweight='bold')
+    ax.set_title('平均絶対パーセント誤差', fontsize=14, fontweight='bold')
     ax.tick_params(axis='x', rotation=45)
     # 値をバーの上に表示
     for bar in bars:
@@ -191,9 +205,9 @@ def plot_category_comparison(sheet_name: str, save_dir: Path):
 
     # MAE
     ax = axes[1]
-    bars = ax.bar(metrics_df['Model'], metrics_df['MAE'], color=colors[:len(metrics_df)])
+    bars = ax.bar(metrics_df['Model_JP'], metrics_df['MAE'], color=colors[:len(metrics_df)])
     ax.set_ylabel('MAE', fontsize=12, fontweight='bold')
-    ax.set_title('Mean Absolute Error', fontsize=14, fontweight='bold')
+    ax.set_title('平均絶対誤差', fontsize=14, fontweight='bold')
     ax.tick_params(axis='x', rotation=45)
     for bar in bars:
         height = bar.get_height()
@@ -202,16 +216,16 @@ def plot_category_comparison(sheet_name: str, save_dir: Path):
 
     # RMSE
     ax = axes[2]
-    bars = ax.bar(metrics_df['Model'], metrics_df['RMSE'], color=colors[:len(metrics_df)])
+    bars = ax.bar(metrics_df['Model_JP'], metrics_df['RMSE'], color=colors[:len(metrics_df)])
     ax.set_ylabel('RMSE', fontsize=12, fontweight='bold')
-    ax.set_title('Root Mean Squared Error', fontsize=14, fontweight='bold')
+    ax.set_title('二乗平均平方根誤差', fontsize=14, fontweight='bold')
     ax.tick_params(axis='x', rotation=45)
     for bar in bars:
         height = bar.get_height()
         ax.text(bar.get_x() + bar.get_width()/2., height,
                 f'{height:.0f}', ha='center', va='bottom', fontsize=10)
 
-    plt.suptitle(f'{sheet_name} Category: Model Performance Comparison',
+    plt.suptitle(f'{sheet_name}カテゴリ: モデル性能比較',
                  fontsize=16, fontweight='bold', y=1.02)
     plt.tight_layout()
 
@@ -251,11 +265,14 @@ def plot_overall_summary(save_dir: Path):
 
     fig, ax = plt.subplots(figsize=(12, 8))
     sns.heatmap(pivot_data, annot=True, fmt='.1f', cmap='RdYlGn_r',
-                cbar_kws={'label': 'MAPE (%)'}, ax=ax, vmin=0, vmax=100)
-    ax.set_title('Model Performance Heatmap: MAPE by Category and Model',
+                cbar_kws={'label': 'MAPE (%)'}, ax=ax, vmin=0, vmax=100,
+                annot_kws={'fontsize': 11})
+    ax.set_title('モデル性能ヒートマップ: カテゴリ別・モデル別 MAPE',
                  fontsize=16, fontweight='bold', pad=20)
-    ax.set_xlabel('Category', fontsize=14, fontweight='bold')
-    ax.set_ylabel('Model', fontsize=14, fontweight='bold')
+    ax.set_xlabel('カテゴリ', fontsize=14, fontweight='bold')
+    ax.set_ylabel('モデル', fontsize=14, fontweight='bold')
+    # Y軸ラベルのフォント設定
+    ax.set_yticklabels(ax.get_yticklabels(), fontfamily='IPAexGothic')
     plt.tight_layout()
 
     save_path = save_dir / 'overall_heatmap.png'
@@ -278,11 +295,11 @@ def plot_overall_summary(save_dir: Path):
     bars = ax.bar(range(len(best_models)), best_models['MAPE'], color=bar_colors)
     ax.set_xticks(range(len(best_models)))
     ax.set_xticklabels([f"{row['カテゴリ']}\n({row['モデル名']})"
-                        for _, row in best_models.iterrows()], fontsize=11)
+                        for _, row in best_models.iterrows()], fontsize=11, fontfamily='IPAexGothic')
     ax.set_ylabel('MAPE (%)', fontsize=14, fontweight='bold')
-    ax.set_title('Best Model Performance by Category', fontsize=16, fontweight='bold', pad=20)
-    ax.axhline(y=20, color='green', linestyle='--', alpha=0.5, label='Excellent (<20%)')
-    ax.axhline(y=40, color='orange', linestyle='--', alpha=0.5, label='Acceptable (<40%)')
+    ax.set_title('カテゴリ別ベストモデル性能', fontsize=16, fontweight='bold', pad=20)
+    ax.axhline(y=20, color='green', linestyle='--', alpha=0.5, label='優秀 (<20%)')
+    ax.axhline(y=40, color='orange', linestyle='--', alpha=0.5, label='許容範囲 (<40%)')
     ax.grid(True, axis='y', alpha=0.3)
 
     # 値をバーの上に表示
@@ -311,20 +328,25 @@ def plot_overall_summary(save_dir: Path):
         baseline_mape = cat_data[cat_data['モデル種別'] == 'ベースライン']['MAPE'].mean()
         ml_mape = cat_data[cat_data['モデル種別'] == '機械学習']['MAPE'].mean()
 
-        bars = ax.bar(['Baseline', 'Machine Learning'], [baseline_mape, ml_mape],
+        bars = ax.bar(['ベースライン', '機械学習'], [baseline_mape, ml_mape],
                      color=['skyblue', 'salmon'])
-        ax.set_ylabel('Average MAPE (%)', fontsize=12, fontweight='bold')
-        ax.set_title(f'{category} Category', fontsize=14, fontweight='bold')
+        ax.set_ylabel('平均MAPE (%)', fontsize=12, fontweight='bold', fontfamily='IPAexGothic')
+        ax.set_title(f'{category}カテゴリ', fontsize=14, fontweight='bold', fontfamily='IPAexGothic')
         ax.set_ylim(0, max(baseline_mape, ml_mape) * 1.2)
+
+        # ティックラベルにフォント指定
+        ax.set_xticklabels(ax.get_xticklabels(), fontfamily='IPAexGothic')
+        ax.set_yticklabels(ax.get_yticklabels(), fontfamily='IPAexGothic')
 
         # 値をバーの上に表示
         for bar in bars:
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width()/2., height,
-                    f'{height:.1f}%', ha='center', va='bottom', fontsize=11, fontweight='bold')
+                    f'{height:.1f}%', ha='center', va='bottom', fontsize=11, fontweight='bold',
+                    fontfamily='IPAexGothic')
 
-    plt.suptitle('Baseline vs Machine Learning: Average MAPE Comparison',
-                 fontsize=16, fontweight='bold', y=1.02)
+    plt.suptitle('ベースライン vs 機械学習：平均MAPE比較',
+                 fontsize=16, fontweight='bold', y=1.02, fontfamily='IPAexGothic')
     plt.tight_layout()
 
     save_path = save_dir / 'baseline_vs_ml.png'
