@@ -83,82 +83,38 @@ def create_tuhs_final_forecast():
 
 
 def create_pca_final_forecast():
-    """PCA最終予測を生成"""
+    """PCA最終予測を生成（pca_product_spike_removal.pyと同じ実装）"""
 
     print("\n" + "="*80)
     print("PCA: Final Forecast Generation")
     print("="*80)
 
+    # pca_product_spike_removal.pyを直接使用
+    from pca_product_spike_removal import PCAProductSpikeRemoval
+
     prep = SalesForecastDataPreparation()
     df = prep.load_data('PCA')
 
-    # 製品レベルスパイク検出（簡略版）
-    products = df['製品名'].unique()
-    spike_df_list = []
+    psr = PCAProductSpikeRemoval()
 
-    for product in products:
-        product_df = df[df['製品名'] == product].copy()
-        monthly = product_df.groupby('年月')['台数'].sum().reset_index()
-        monthly.columns = ['ds', 'y']
+    # 1. 製品レベルスパイク検出
+    spike_df = psr.detect_product_spikes(df)
 
-        if len(monthly) < 6:
-            continue
+    # 2. シリーズレベルベースライン作成
+    series_baselines = psr.create_series_baseline(df, spike_df)
 
-        is_spike = prep.detect_spikes(monthly['y'], method='combined',
-                                     iqr_multiplier=2.0, z_threshold=2.5)
-
-        for idx, row in monthly.iterrows():
-            spike_df_list.append({
-                '製品名': product,
-                'ds': row['ds'],
-                'y': row['y'],
-                'is_spike': is_spike.iloc[idx] if idx < len(is_spike) else False
-            })
-
-    spike_df = pd.DataFrame(spike_df_list)
-
-    # シリーズレベルベースライン作成
-    series_list = sorted(df['モデル名'].unique())
+    # 3. 各シリーズで予測
     all_forecasts = []
 
-    for series_name in series_list:
-        series_products = df[df['モデル名'] == series_name]['製品名'].unique()
-        all_dates = sorted(df['年月'].unique())
+    for series_name, baseline_data in series_baselines.items():
+        train_baseline = baseline_data['train']
+        result = psr.forecast_series_with_ensemble(train_baseline, 12, series_name)
+        all_forecasts.append(result['forecast'])
 
-        series_baseline = []
-        for date in all_dates:
-            date_total = 0
-            for product in series_products:
-                product_month_data = df[(df['製品名'] == product) & (df['年月'] == date)]
-                if len(product_month_data) == 0:
-                    continue
-
-                product_value = product_month_data['台数'].sum()
-                spike_info = spike_df[(spike_df['製品名'] == product) & (spike_df['ds'] == date)]
-
-                if len(spike_info) > 0 and spike_info['is_spike'].values[0]:
-                    product_spike_df = spike_df[spike_df['製品名'] == product]
-                    non_spike_values = product_spike_df[~product_spike_df['is_spike']]['y'].values
-                    if len(non_spike_values) > 0:
-                        product_value = np.median(non_spike_values)
-
-                date_total += product_value
-
-            series_baseline.append({'ds': date, 'y': date_total})
-
-        baseline_df = pd.DataFrame(series_baseline)
-        train_baseline = baseline_df[baseline_df['ds'] <= '2024-05-31'].copy()
-
-        # アンサンブル予測（簡略版）
-        model = MovingAverageForecaster(window=6)
-        model.fit(train_baseline)
-        forecast = model.predict(12)
-
-        all_forecasts.append(forecast)
-
-    # カテゴリレベル集約
+    # 4. カテゴリレベルに集約
     category_forecast = all_forecasts[0][['ds']].copy()
     category_forecast['yhat'] = 0
+
     for forecast_df in all_forecasts:
         category_forecast['yhat'] += forecast_df['yhat']
 
