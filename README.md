@@ -1,86 +1,285 @@
 # 購買予測システム
 
-Excelファイルのデータを使用して購買予測を行うプロジェクトです。
+電源製品（PCA、PBA、TUHS）の月次販売台数を予測するシステムです。
 
-## プロジェクト構成
+**評価期間**: 訓練 2020-06～2024-05（48か月） / テスト 2024-06～2025-05（12か月）
+**最終更新**: 2025-10-21
+
+---
+
+## 📊 評価結果サマリー
+
+### カテゴリ別ベストモデル
+
+| カテゴリ | ベストモデル | MAPE | 評価 | 実用性 |
+|---------|-------------|------|------|-------|
+| **TUHS** | 移動平均(6か月) | **13.53%** | ⭐⭐⭐⭐⭐ 優秀 | ✅ 実用可能 |
+| **PBA** | 移動平均(6か月) | **26.71%** | ⭐⭐⭐ 中程度 | ⚠️ 要注意 |
+| **PCA** | 前年同月 | **51.13%** | ⭐⭐ 要改善 | ❌ 実用不可 |
+
+**主要な発見:**
+- シンプルなベースラインが機械学習（LightGBM）を全カテゴリで上回る
+- PCAは一時的大量発注（スパイク）の影響で精度が低い
+- PBAは-51%の急激な減少トレンドで予測が困難
+
+---
+
+## 📁 プロジェクト構成
 
 ```
 .
 ├── data/
-│   ├── raw/          # 生データ（Excelファイルなど）
-│   └── processed/    # 前処理済みデータ
-├── models/           # 学習済みモデル
-├── notebooks/        # Jupyter Notebook
-├── src/              # ソースコード
-│   ├── data_loader.py      # データ読み込み
-│   ├── preprocessor.py     # データ前処理
-│   ├── train.py            # モデル学習
-│   └── predict.py          # 予測実行
-├── requirements.txt  # 依存ライブラリ
-└── README.md         # このファイル
+│   ├── raw/                        # 生データ
+│   │   └── 実績（5年分).xlsx      # 解析対象データ（5年分）
+│   └── processed/                  # 前処理済みデータ
+│       └── model_evaluation_results.csv  # 評価結果
+│
+├── visualizations/                 # 生成されたグラフ（12ファイル）
+│   ├── TUHS_*.png                 # TUHSカテゴリのグラフ
+│   ├── PCA_*.png                  # PCAカテゴリのグラフ
+│   ├── PBA_*.png                  # PBAカテゴリのグラフ
+│   └── overall_*.png              # 総合サマリーグラフ
+│
+├── src/                           # ソースコード
+│   ├── __init__.py
+│   ├── data_preparation.py        # データ準備（スパイク検出付き）
+│   ├── baseline_models.py         # ベースラインモデル
+│   ├── lightgbm_models.py         # LightGBMモデル
+│   ├── prophet_models.py          # Prophetモデル
+│   ├── data_loader.py             # データ読み込み
+│   ├── preprocessor.py            # データ前処理
+│   ├── train.py                   # モデル学習
+│   └── predict.py                 # 予測実行
+│
+├── ドキュメント
+│   ├── BEST_PRACTICE_PROPOSAL.md  # ベストプラクティス提案
+│   ├── SPIKE_HANDLING_STRATEGY.md # スパイク対応戦略
+│   ├── EVALUATION_REPORT.md       # 評価レポート
+│   └── VISUALIZATION_REPORT.md    # 可視化レポート
+│
+├── 分析スクリプト
+│   ├── analyze_data_structure.py  # データ構造分析
+│   ├── exploratory_data_analysis.py  # EDA
+│   ├── analyze_spikes.py          # スパイク分析
+│   ├── run_full_evaluation.py     # 総合評価
+│   └── create_visualizations.py   # 可視化生成
+│
+├── その他
+│   ├── example.py                 # 実行例
+│   ├── generate_sample_data.py    # サンプルデータ生成
+│   ├── requirements.txt           # 依存ライブラリ
+│   └── README.md                  # このファイル
 ```
 
-## セットアップ手順
+---
 
-### 1. Python仮想環境の作成
+## 🚀 クイックスタート
 
-```bash
-python3 -m venv venv
-source venv/bin/activate  # Windowsの場合: venv\Scripts\activate
-```
-
-### 2. 依存ライブラリのインストール
+### 1. 依存ライブラリのインストール
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. データの配置
+### 2. 総合評価の実行
 
-Excelファイルを `data/raw/` ディレクトリに配置してください。
-
-## 使用方法
-
-### データの読み込みと前処理
-
-```python
-from src.data_loader import load_excel_data
-from src.preprocessor import preprocess_data
-
-# データ読み込み
-df = load_excel_data('data/raw/your_data.xlsx')
-
-# 前処理
-X_train, X_test, y_train, y_test = preprocess_data(df)
+```bash
+# 全カテゴリ・全モデルの評価
+python3 run_full_evaluation.py
 ```
 
-### モデルの学習
+### 3. 可視化レポートの生成
 
-```python
-from src.train import train_model
-
-# モデル学習
-model = train_model(X_train, y_train)
+```bash
+# グラフの生成
+python3 create_visualizations.py
 ```
 
-### 予測の実行
+---
 
-```python
-from src.predict import predict
+## 📊 実装済みモデル
 
-# 予測
-predictions = predict(model, X_test)
-```
+### ベースラインモデル (`src/baseline_models.py`)
 
-## 使用ライブラリ
+1. **移動平均** (3, 6, 12か月)
+2. **前年同月** (季節性ナイーブ)
+3. **指数平滑法**
+4. **線形トレンド**
+5. **ロバスト移動平均** (スパイク除外版)
 
-- pandas: データ処理
-- numpy: 数値計算
-- scikit-learn: 機械学習
-- xgboost, lightgbm: 勾配ブースティング
-- matplotlib, seaborn: データ可視化
-- openpyxl: Excel読み込み
+### 機械学習モデル (`src/lightgbm_models.py`)
 
-## ライセンス
+- **LightGBM**: 時系列特徴量エンジニアリング付き
+  - ラグ特徴量（1, 2, 3, 6, 12か月）
+  - 移動平均/標準偏差特徴量
+  - **スパイク関連特徴量** (前月スパイク、過去スパイク回数など)
+  - 時間特徴量（月、四半期、年）
+
+### 時系列専門モデル (`src/prophet_models.py`)
+
+- **Prophet**: スパイク除外版・考慮版（※cmdstan要インストール）
+
+---
+
+## 📈 主要な分析結果
+
+### スパイク（一時的大量発注）の検出
+
+| カテゴリ | スパイク数 | 平均倍率 | 最大倍率 | 典型例 |
+|---------|----------|---------|---------|--------|
+| **PCA** | 96個 | 7.65x | **62.69x** | PCA1000F-48-T: 通常9台 → 586台 |
+| **PBA** | 48個 | 5.17x | 14.42x | PBA300F-24-F4: 通常277台 → 4,003台 |
+| **TUHS** | 49個 | 4.38x | 11.78x | TUHS15F15: 通常72台 → 858台 |
+
+### トレンド分析
+
+| カテゴリ | 訓練期間平均 | テスト期間平均 | トレンド |
+|---------|------------|------------|---------|
+| **TUHS** | 62,971台/月 | 55,373台/月 | **-12.1%** |
+| **PCA** | 1,653台/月 | 1,457台/月 | **-11.9%** |
+| **PBA** | 57,548台/月 | 28,074台/月 | **-51.2%** ⚠️ |
+
+---
+
+## 📖 ドキュメント
+
+### 詳細レポート
+
+1. **[BEST_PRACTICE_PROPOSAL.md](BEST_PRACTICE_PROPOSAL.md)**
+   - データ分析結果
+   - 推奨する予測手法
+   - 階層的ハイブリッドアプローチ
+
+2. **[SPIKE_HANDLING_STRATEGY.md](SPIKE_HANDLING_STRATEGY.md)**
+   - スパイク分析結果
+   - 2層モデリング戦略
+   - ベース需要 + スパイク調整
+
+3. **[EVALUATION_REPORT.md](EVALUATION_REPORT.md)**
+   - 全モデルの評価結果
+   - カテゴリ別分析
+   - 改善提案
+
+4. **[VISUALIZATION_REPORT.md](VISUALIZATION_REPORT.md)**
+   - グラフの読み方
+   - 可視化から得られた洞察
+   - 次のステップ
+
+---
+
+## 🎯 次のステップ（推奨）
+
+### 優先度 ★★★★★ 最重要
+
+1. **PBAの減少原因調査**
+   - -51%は異常値の可能性
+   - ビジネス部門へのヒアリング
+
+2. **Prophet実装** (cmdstan解決後)
+   - スパイク除外版
+   - トレンド追従版
+   - 期待改善: PCA 51% → 25-35%
+
+3. **スパイク対応2層モデル**
+   - ベース需要予測
+   - スパイク確率的予測
+   - 3シナリオ予測
+
+### 優先度 ★★★★☆ 重要
+
+4. **階層的予測**
+   - 上位30製品の個別モデリング
+   - シリーズ別予測
+
+5. **アンサンブルモデル**
+   - Prophet + ベースライン
+
+---
+
+## 💡 重要な発見
+
+### 1. シンプルが最強
+
+全カテゴリで、ベースライン（移動平均）がLightGBMを上回りました。
+
+| カテゴリ | ベースライン最良 | LightGBM | 差分 |
+|---------|----------------|----------|------|
+| TUHS | 13.53% | 27.17% | +13.64pt ⬇️ |
+| PBA | 26.71% | 133.71% | +107.00pt ⬇️ |
+| PCA | 51.13% | 55.95% | +4.82pt ⬇️ |
+
+**理由:**
+- データ量が限定的（48か月のみ）
+- 反復予測による誤差累積
+- スパイクの影響
+
+### 2. スパイクへの対応が鍵
+
+**PCAの低精度はスパイクが主因:**
+- 96個のスパイク検出（最大62.7倍）
+- スパイク除外で大幅改善が期待できる
+
+### 3. カテゴリ別の特性
+
+- **TUHS**: 製品数23、安定型 → シンプルモデルで十分
+- **PBA**: 製品数1,430、大幅減少型 → トレンド追従モデル必須
+- **PCA**: 製品数258、スパイク多発型 → スパイク対応モデル必須
+
+---
+
+## 📊 可視化レポート
+
+`visualizations/` ディレクトリに12個のグラフを生成しました：
+
+### カテゴリ別（各3種類）
+
+- **時系列グラフ**: 全期間のトレンドと予測
+- **テスト期間詳細**: 予測精度の詳細確認
+- **メトリクス比較**: MAPE、MAE、RMSEの比較
+
+### 総合サマリー
+
+- **ヒートマップ**: 全モデル性能の一覧
+- **ベストモデル比較**: カテゴリ別推奨モデル
+- **ベースライン vs 機械学習**: アプローチの有効性
+
+詳細は [VISUALIZATION_REPORT.md](VISUALIZATION_REPORT.md) を参照してください。
+
+---
+
+## 🔧 使用ライブラリ
+
+### データ処理
+- pandas 2.1.4
+- numpy 1.26.2
+- openpyxl 3.1.2
+
+### 機械学習
+- scikit-learn 1.3.2
+- lightgbm 4.1.0
+- xgboost 2.0.3
+- prophet 1.2.0
+
+### 可視化
+- matplotlib 3.8.2
+- seaborn 0.13.0
+
+---
+
+## 📞 サポート
+
+質問や改善提案がありましたら、GitHubのIssueまでお願いします。
+
+---
+
+## 📝 ライセンス
 
 MIT License
+
+---
+
+**最終更新**: 2025-10-21
+**バージョン**: 1.0.0
+**作成者**: Claude Code
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
