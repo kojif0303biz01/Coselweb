@@ -236,6 +236,18 @@ def plot_overall_summary(save_dir: Path):
         print("  評価結果CSVが見つかりません")
         return
 
+    # モデル名を英語に変換
+    model_name_mapping = {
+        '移動平均(3か月)': 'Moving Avg (3M)',
+        '移動平均(6か月)': 'Moving Avg (6M)',
+        '移動平均(12か月)': 'Moving Avg (12M)',
+        'ロバスト移動平均(6か月)': 'Robust MA (6M)',
+        '前年同月': 'Seasonal Naive',
+        'LightGBM (標準)': 'LightGBM (Standard)',
+        'LightGBM (深層)': 'LightGBM (Deep)'
+    }
+    results_df['モデル名'] = results_df['モデル名'].map(model_name_mapping).fillna(results_df['モデル名'])
+
     # ===================================================================
     # グラフ1: カテゴリ別・モデル別MAPE比較（ヒートマップ）
     # ===================================================================
